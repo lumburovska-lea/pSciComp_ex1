@@ -11,10 +11,10 @@ from types import SimpleNamespace
 from exohw.greetings import make_greetings
 from exohw.io import load_json_file
 
-# Read data directory locations from the environment.
+# Read data directory locations from the environment, with defaults.
 # Pillar: Environment
-input_dir = os.environ["INPUT_DIR"]
-output_dir = os.environ["OUTPUT_DIR"]
+input_dir = os.environ.get("INPUT_DIR", "data/raw")
+output_dir = os.environ.get("OUTPUT_DIR", "data/final")
 
 # Load configuration: target course name and data key mappings.
 # Pillar: Configuration
