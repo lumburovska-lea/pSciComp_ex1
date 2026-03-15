@@ -1,0 +1,61 @@
+name: Build and Push Apptainer Container
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history needed for git tags (hatch-vcs versioning)
+
+      - name: Setup Apptainer
+        uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.3.4
+
+      - name: Get version from git
+        id: version
+        run: |
+          VERSION=$(git describe --tags --always --dirty)
+          # Replace + with - to make it a valid Docker/GHCR tag
+          VERSION=${VERSION//+/-}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build container
+        run: |
+          apptainer build \
+            --build-arg VERSION=${{ steps.version.outputs.version }} \
+            env.sif containers/env.def
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | apptainer registry login \
+            --username ${{ github.actor }} \
+            --password-stdin \
+            oras://ghcr.io
+
+      - name: Push container to GHCR
+        run: |
+          apptainer push env.sif \
+            oras://ghcr.io/${{ github.repository_owner }}/env-sif:${{ steps.version.outputs.version }}-${{ matrix.arch }}
+          apptainer push env.sif \
+            oras://ghcr.io/${{ github.repository_owner }}/env-sif:latest-${{ matrix.arch }}
